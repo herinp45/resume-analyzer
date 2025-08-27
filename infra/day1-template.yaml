@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Day 1 infra for Resume Analyzer.
+Resources:
+  ResumeUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'resume-upload-bucket-${AWS::AccountId}-${AWS::Region}'
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - 'http://localhost:5173'
+            AllowedMethods:
+              - GET
+              - PUT
+              - DELETE
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
