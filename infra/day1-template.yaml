@@ -59,6 +59,19 @@ Resources:
                   - comprehend:DetectKeyPhrases
                 Resource: '*'
 
-
+  # Lambda Stub
+  ResumeLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "resume-analyzer-lambda-${AWS::Region}"
+      Handler: app.handler
+      Role: !GetAtt ResumeLambdaRole.Arn
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          import json
+          def handler(event, context):
+              return {"statusCode": 200, "body": json.dumps({"ok": True, "msg": "stub"})}
+      Timeout: 10
 
 
