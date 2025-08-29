@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Day 1 infra for Resume Analyzer.
+Resources:
+  ResumeUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'resume-upload-bucket-${AWS::AccountId}-${AWS::Region}'
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - 'http://localhost:5173'
+            AllowedMethods:
+              - GET
+              - PUT
+              - DELETE
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
+
+  # Lambda Execution Rule
+  ResumeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'resume-analyzer-lambda-role-${AWS::AccountId}-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ResumeLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: !Sub 'arn:aws:s3:::resume-upload-bucket-${AWS::AccountId}-${AWS::Region}/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - textract:DetectDocumentText
+                  - textract:AnalyzeDocument
+                  - comprehend:DetectEntities
+                  - comprehend:DetectKeyPhrases
+                Resource: '*'
+
+  # Lambda Stub
+  ResumeLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "resume-analyzer-lambda-${AWS::Region}"
+      Handler: app.handler
+      Role: !GetAtt ResumeLambdaRole.Arn
+      Runtime: python3.12
+      Timeout: 30
+      Code:
+        S3Bucket: dummy-placeholder-bucket
+        S3Key: dummy.zip
+
+  MyLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ResumeLambdaFunction
+      Action: lambda:InvokeFunction
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*
+
+
