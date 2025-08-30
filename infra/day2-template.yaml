@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Day 1 infra for Resume Analyzer.
+Description: Day 2 infra for Resume Analyzer.
 Resources:
   ResumeUploadBucket:
     Type: AWS::S3::Bucket
@@ -21,6 +21,15 @@ Resources:
             AllowedHeaders:
               - '*'
             MaxAge: 3000
+
+  S3InvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ResumeLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !GetAtt ResumeUploadBucket.Arn
+
 
   # Lambda Execution Rule
   ResumeLambdaRole:
@@ -67,16 +76,12 @@ Resources:
       Handler: app.handler
       Role: !GetAtt ResumeLambdaRole.Arn
       Runtime: python3.12
-      Timeout: 30
       Code:
-        S3Bucket: dummy-placeholder-bucket
-        S3Key: dummy.zip
+        ZipFile: |
+          import json
+          def handler(event, context):
+              return {"statusCode": 200, "body": json.dumps({"ok": True, "msg": "stub"})}
+      Timeout: 10
 
-  MyLambdaInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref ResumeLambdaFunction
-      Action: lambda:InvokeFunction
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*
 
 
