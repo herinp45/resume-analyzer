@@ -1,11 +1,10 @@
 import json
-from idlelib.rpc import response_queue
-
 import boto3
 import urllib.parse
+import PyPDF2
+import io
 
 s3 = boto3.client('s3')
-texract = boto3.client('textract')
 
 def handler(event, context):
     print("Received event: " + json.dumps(event, indent=2))
@@ -13,22 +12,25 @@ def handler(event, context):
     # Extract bucket name and object key from the event
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = event['Records'][0]['s3']['object']['key']
+    key = urllib.parse.unquote_plus(key)
 
-    # URL decode
-    response = texract.detect_document_text(
-        Document={
-            'S3Object': {
-                'Bucket': bucket,
-                'Name': key
-            }
+    try:
+        # Get the PDF file from S3
+        response = s3.get_object(Bucket=bucket, Key=key)
+        pdf_content = response['Body'].read()
+
+        # Read the PDF content
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+        text_content = ""
+        for page in pdf_reader.pages:
+            text_content += page.extract_text() + "\n"
+        print("Extracted text: " + text_content)
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'text': text_content})
         }
-    )
-    print("Textract response: " + json.dumps(response, indent=2))
+    except Exception as e:
+        print(e)
+        print(f"Error processing object {key} from bucket {bucket}.")
+        raise e
 
-    # Extract detected text
-    detected_text = "".join(item['Text'] for item in response['Blocks'] if item['BlockType'] == 'LINE')
-
-    return {
-        'statusCode': 200,
-        'body': json.dumps({'detected_text': detected_text})
-    }
