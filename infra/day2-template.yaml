@@ -61,12 +61,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
-                Action:
-                  - textract:DetectDocumentText
-                  - textract:AnalyzeDocument
-                  - comprehend:DetectEntities
-                  - comprehend:DetectKeyPhrases
-                Resource: '*'
+                Action: "sageMaker:InvokeEndpoint"
+                Resource: "arn:aws:sagemaker:us-east-2:065588028524:endpoint/skill-extract-huggingface"
+
 
   # Lambda Stub
   ResumeLambdaFunction:
