@@ -5,6 +5,9 @@ import PyPDF2
 import io
 
 s3 = boto3.client('s3')
+runtime = boto3.client("sagemaker-runtime", region_name="us-east-2")
+
+ENDPOINT_NAME = "skill-extract-huggingface"
 
 def handler(event, context):
     print("Received event: " + json.dumps(event, indent=2))
@@ -25,9 +28,17 @@ def handler(event, context):
         for page in pdf_reader.pages:
             text_content += page.extract_text() + "\n"
         print("Extracted text: " + text_content)
+        # Invoke the SageMaker endpoint
+        response = runtime.invoke_endpoint(
+            EndpointName=ENDPOINT_NAME,
+            ContentType="application/json",
+            Body=json.dumps({"inputs": text_content})
+        )
+        result = json.loads(response['Body'].read().decode())
+        print("Inference result: " + str(result))
         return {
             'statusCode': 200,
-            'body': json.dumps({'text': text_content})
+            'body': json.dumps({'skills': result})
         }
     except Exception as e:
         print(e)
