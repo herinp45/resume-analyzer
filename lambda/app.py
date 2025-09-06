@@ -9,30 +9,46 @@ s3 = boto3.client("s3", region_name="us-east-2")
 
 ENDPOINT_NAME = "skill-extract-hugging-face-endpoint"
 
-# Words we don’t want to treat as skills
-FILLER_WORDS = {
-    "skills", "in", "and", "with", "at", "on", "for",
-    ",", ".", ";", ":", "-", "the", "a", "an"
-}
-
-# Common false positives (degree names, random tokens, etc.)
-FALSE_POSITIVES = {
-    "be", "engineering", "engineer", "bachelor", "university",
-    "education", "indian", "student"
+# Stopwords / false positives that should not appear as skills
+STOPWORDS = {
+    "be", "engineering", "engineer", "bachelor", "university", "education",
+    "indian", "student", "students", "teaching", "mentoring", "course",
+    "weekly", "assignments", "academic", "grad", "date", "time", "help", "of",
+    "to", "in", "on", "with", "at", "by", "like", "approaches", "materialills"
 }
 
 def clean_token(token: str) -> str:
+    """
+    Normalize and filter tokens that are likely false skills.
+    """
     token = token.strip()
-    token = re.sub(r"[^a-zA-Z0-9+#]+", "", token)  # keep alphanumerics, +, #
+    token = re.sub(r"[^a-zA-Z0-9+#]+", "", token)  # remove symbols except +, #
     token_lower = token.lower()
 
-    if not token or token_lower in FILLER_WORDS or token_lower in FALSE_POSITIVES:
+    # Drop empty or stopwords
+    if not token or token_lower in STOPWORDS:
         return ""
-    return token
+
+    # Drop numbers unless it's like C# or C++
+    if token.isdigit():
+        return ""
+
+    # Drop short junk (len=1) unless it's C, R, or Go
+    if len(token) == 1 and token not in {"C", "R", "Go"}:
+        return ""
+
+    # Normalize acronyms (e.g., SQL, AWS)
+    if token.isupper():
+        return token
+
+    # Capitalize for consistency
+    return token.capitalize()
 
 
 def extract_skills(ner_output):
-
+    """
+    Extract and clean skills from model output.
+    """
     skills = []
     for item in ner_output:
         label = item.get("entity", "")
@@ -43,7 +59,8 @@ def extract_skills(ner_output):
             if not cleaned:
                 continue
             if token.startswith("##") and skills:
-                skills[-1] += token[2:]  # merge subwords
+                # merge subwords like "##Script" → "JavaScript"
+                skills[-1] += token[2:]
             else:
                 skills.append(cleaned)
 
@@ -51,7 +68,9 @@ def extract_skills(ner_output):
 
 
 def chunk_text(text, max_chars=1000):
-
+    """
+    Break text into chunks so the model doesn't exceed token limits.
+    """
     words = text.split()
     chunks, current = [], []
 
@@ -75,11 +94,11 @@ def handler(event, context):
         bucket = event["Records"][0]["s3"]["bucket"]["name"]
         key = event["Records"][0]["s3"]["object"]["key"]
 
+        # Get PDF from S3
         s3_response = s3.get_object(Bucket=bucket, Key=key)
         pdf_content = s3_response["Body"].read()
-        resume_text = ""
 
-        # Extract text from PDF
+        resume_text = ""
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
         for page in pdf_reader.pages:
             text = page.extract_text()
@@ -99,7 +118,7 @@ def handler(event, context):
             ner_output = json.loads(sm_response["Body"].read().decode())
             all_skills.extend(extract_skills(ner_output))
 
-        # Deduplicate + sort skills
+        # Deduplicate + sort
         unique_skills = sorted(set(all_skills), key=str.lower)
         print("Extracted skills:", unique_skills)
 
