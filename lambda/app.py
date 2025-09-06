@@ -124,6 +124,10 @@ def handler(event, context):
 
         return {
             "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
             "body": json.dumps({"skills": unique_skills}),
         }
 
@@ -131,5 +135,9 @@ def handler(event, context):
         print("Error:", str(e))
         return {
             "statusCode": 500,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
             "body": json.dumps({"error": str(e)}),
         }
