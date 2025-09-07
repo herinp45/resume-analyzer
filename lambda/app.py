@@ -3,9 +3,12 @@ import boto3
 import io
 import PyPDF2
 import re
+import os
 
 runtime = boto3.client("sagemaker-runtime", region_name="us-east-2")
 s3 = boto3.client("s3", region_name="us-east-2")
+dynamodb = boto3.resource("dynamodb", region_name="us-east-2")
+table = dynamodb.Table("ResumeAnalysis")
 
 ENDPOINT_NAME = "skill-extract-hugging-face-endpoint"
 
@@ -94,7 +97,9 @@ def handler(event, context):
         bucket = event["Records"][0]["s3"]["bucket"]["name"]
         key = event["Records"][0]["s3"]["object"]["key"]
 
-        # Get PDF from S3
+        resumeId = os.path.splitext(key.split("/")[-1])[0]
+
+    # Get PDF from S3
         s3_response = s3.get_object(Bucket=bucket, Key=key)
         pdf_content = s3_response["Body"].read()
 
@@ -121,6 +126,14 @@ def handler(event, context):
         # Deduplicate + sort
         unique_skills = sorted(set(all_skills), key=str.lower)
         print("Extracted skills:", unique_skills)
+
+        # Store in DynamoDB
+        table.put_item(
+            Item={
+                "resumeId": resumeId,
+                "skills": unique_skills,
+            }
+        )
 
         return {
             "statusCode": 200,
